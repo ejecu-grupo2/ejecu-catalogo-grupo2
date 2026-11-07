@@ -61,7 +61,7 @@ El workflow existente lee `SONAR_TOKEN` y `SONAR_HOST_URL` desde GitHub Actions
 Secrets. El archivo `sonar-project.properties` ya existe y no lleva el token.
 
 `http://localhost:9000` sirve para acceder desde este computador. No funciona
-como `SONAR_HOST_URL` para los runners `ubuntu-24.04` alojados por GitHub:
+como `SONAR_HOST_URL` para los runners alojados por GitHub:
 en ellos localhost es otro equipo.
 
 Para usar esta instancia en CI hay que elegir y configurar una de estas opciones:
@@ -93,3 +93,19 @@ Conservar `.env.sonar` y los volúmenes. No usar `down -v`: elimina los datos.
 - [Instalación con Docker](https://docs.sonarsource.com/sonarqube-community-build/server-installation/from-docker-image/set-up-and-start-container).
 - [Requisitos Linux](https://docs.sonarsource.com/sonarqube-community-build/server-installation/pre-installation/linux).
 - [Funciones por edición](https://docs.sonarsource.com/sonarqube-community-build/feature-comparison-table).
+
+## Runner Ubuntu del equipo
+
+El workflow de esta rama usa las etiquetas predeterminadas `[self-hosted, Linux, X64]`,
+porque el runner se registró sin etiqueta adicional. Los tres jobs necesitan ese
+runner disponible; deben mantenerse Ubuntu, `./run.sh` y Docker Desktop activos.
+La configuración inicial comprueba Docker y la URL de SonarQube sin mostrar el token.
+
+Desde una segunda terminal Ubuntu, comprobar `docker info` y
+`curl --max-time 30 http://localhost:9000/api/system/status` antes de ejecutar.
+Si responde UP, guardar `http://localhost:9000` como `SONAR_HOST_URL`. Esto solo es
+válido para este runner local.
+
+El evento `workflow_dispatch` permite ejecutar manualmente CI una vez que el archivo
+esté integrado en la rama principal. El análisis de PR sigue requiriendo una edición
+compatible; cambiar el runner no añade esa función a Community Build.
