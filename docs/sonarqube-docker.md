@@ -1,111 +1,122 @@
-# SonarQube con Docker
+# SonarQube con Docker y GitHub Actions
 
-Esta configuración levanta una instancia local independiente de la base del catálogo.
-Usa SonarQube Community Build y su propia PostgreSQL, con volúmenes persistentes.
-El token de análisis se genera después de iniciar SonarQube; la contraseña de
-PostgreSQL no es ese token.
+Configuracion adaptada de `ejemplo-pingeso`: SonarQube corre localmente en Docker;
+Cloudflare publica una URL HTTPS temporal; los jobs se ejecutan en `ubuntu-24.04`
+de GitHub. No se necesita el runner personal de WSL para este esquema.
 
-## 1. Iniciar Docker Desktop
+## 1. Preparar e iniciar SonarQube
 
-Seleccionar contenedores Linux y esperar a que Docker esté funcionando:
-
-```powershell
-docker info
-```
-
-Si este comando falla, resolver primero el inicio de Docker Desktop.
-
-## 2. Crear la configuración local e iniciar
-
-Desde la raíz del repositorio, en PowerShell:
+Abrir Docker Desktop. Desde la raiz del proyecto, en PowerShell:
 
 ```powershell
 powershell -NoProfile -File scripts/preparar-sonarqube.ps1
-docker compose --env-file .env.sonar -f compose.sonarqube.yaml up -d
-docker compose --env-file .env.sonar -f compose.sonarqube.yaml logs -f sonarqube
+docker compose --env-file .env.sonar -f compose.sonarqube.yaml up -d sonar-db sonarqube
 ```
 
-El script crea `.env.sonar` con una clave aleatoria. Git ignora este archivo.
-No ejecutar `docker compose config` para compartir su salida: contiene la clave
-resuelta. La primera descarga y el inicio pueden tardar varios minutos.
-Ctrl+C sale de la vista de logs; los contenedores continúan ejecutándose.
+El script conserva `.env.sonar` si ya existe. No borrarlo: contiene la clave de
+PostgreSQL, que es distinta del token de analisis. Git ignora este archivo.
+Los volumenes conservan la base, proyectos y configuracion de SonarQube.
 
-Abrir http://localhost:9000. El acceso inicial es `admin` / `admin`; cambiar la
-contraseña cuando SonarQube lo solicite. No publicar el servicio en internet con
-estas credenciales. La configuración solo escucha en el equipo local.
+Abrir http://localhost:9000. En el primer acceso, usar `admin` / `admin` y cambiar
+la clave. Si el proyecto ya existe y hay un token guardado, conservarlos.
 
-Si Elasticsearch termina por `vm.max_map_count`, revisar los requisitos Linux
-oficiales y ajustar ese parámetro en el host Linux de Docker Desktop/WSL2. No se
-desactivan las comprobaciones de Elasticsearch en esta configuración.
+Crear un proyecto local con clave `ejecu-catalogo-grupo2` y rama principal `main`.
+Definir New Code antes del primer analisis y asignar el Quality Gate del DAS:
+0 bugs y vulnerabilidades nuevos, 100% de hotspots revisados, duplicacion menor
+al 3% y cobertura minima del 60%.
 
-## 3. Crear el proyecto
-
-En SonarQube, seleccionar crear proyecto local/manual y completar:
-
-- Nombre: `Catálogo · Grupo 2`.
-- Clave: `ejecu-catalogo-grupo2`, igual que `sonar-project.properties`.
-- Rama principal: `main`.
-- Definición de New Code: acordar y configurar antes del primer análisis.
-
-Crear/asignar el Quality Gate del DAS: cero bugs y vulnerabilidades nuevas,
-hotspots revisados al 100%, duplicación menor al 3% y cobertura mínima del 60%.
-Los nombres de las métricas pueden variar según el modo y versión de SonarQube.
-
-En la configuración del análisis o en My Account > Security, generar un token
-de análisis limitado al proyecto. Copiarlo directamente al almacenamiento de
-secretos; no guardarlo en archivos versionados ni enviarlo por chat.
-
-## 4. Conectar con el pipeline
-
-El workflow existente lee `SONAR_TOKEN` y `SONAR_HOST_URL` desde GitHub Actions
-Secrets. El archivo `sonar-project.properties` ya existe y no lleva el token.
-
-`http://localhost:9000` sirve para acceder desde este computador. No funciona
-como `SONAR_HOST_URL` para los runners alojados por GitHub:
-en ellos localhost es otro equipo.
-
-Para usar esta instancia en CI hay que elegir y configurar una de estas opciones:
-
-- Alojar Docker en un servidor al que accedan los runners, con HTTPS y acceso
-  controlado. Guardar su URL real como `SONAR_HOST_URL`.
-- Usar un runner propio que alcance esta instancia. Requiere preparar el runner
-  y adaptar el workflow; no se instala ni cambia automáticamente aquí.
-
-Community Build permite análisis de la rama principal, pero no análisis de PR
-nativo. El DAS exige análisis en cada PR; para cumplirlo hay que confirmar con el
-profesor una edición con soporte de PR o una alternativa explícitamente aprobada.
-Este Compose local no resuelve esa diferencia ni el bloqueo de facturación de
-GitHub Actions. No se omite el Quality Gate ni se rebaja la protección de main.
-
-## Operación
+Comprobar que el servicio responde antes de abrir el tunel:
 
 ```powershell
-docker compose --env-file .env.sonar -f compose.sonarqube.yaml ps
-docker compose --env-file .env.sonar -f compose.sonarqube.yaml stop
-docker compose --env-file .env.sonar -f compose.sonarqube.yaml start
+curl.exe --max-time 30 http://127.0.0.1:9000/api/system/status
 ```
 
-Conservar `.env.sonar` y los volúmenes. No usar `down -v`: elimina los datos.
+Debe devolver `"status":"UP"`. Si falla, revisar:
+
+```powershell
+docker compose --env-file .env.sonar -f compose.sonarqube.yaml logs --tail 80 sonarqube
+```
+
+## 2. Iniciar el tunel del ejemplo
+
+El perfil `tunnel` es opcional: no publica SonarQube al iniciar los otros servicios.
+Al iniciarlo, la interfaz y API de SonarQube seran accesibles mediante una URL
+publica temporal. Mantener autenticacion y una clave de administrador propia.
+
+```powershell
+docker compose --env-file .env.sonar -f compose.sonarqube.yaml --profile tunnel up -d sonar-tunnel
+docker compose --env-file .env.sonar -f compose.sonarqube.yaml logs -f sonar-tunnel
+```
+
+Buscar en los logs una URL como `https://nombre-aleatorio.trycloudflare.com`.
+Copiar la URL completa. Ctrl+C sale de los logs, pero el tunel sigue activo en
+Docker. El contenedor conecta a `http://sonarqube:9000` por la red interna de
+Compose; no depende de `--network=host` ni de localhost entre Windows y WSL.
+
+Comprobar la URL publica sustituyendo el dominio del ejemplo:
+
+```powershell
+curl.exe --max-time 30 https://nombre-aleatorio.trycloudflare.com/api/system/status
+```
+
+Debe responder UP. Los Quick Tunnels son temporales para pruebas; la URL puede
+cambiar al recrearlos. Si cambia, actualizar el secret correspondiente.
+
+## 3. Configurar los secrets de GitHub
+
+En el repositorio: Settings > Secrets and variables > Actions.
+
+| Nombre           | Valor                                                           |
+| ---------------- | --------------------------------------------------------------- |
+| `SONAR_TOKEN`    | Token de analisis del proyecto, ya generado en SonarQube.       |
+| `SONAR_HOST_URL` | URL HTTPS publica del tunel; reemplaza `http://localhost:9000`. |
+
+El token nunca se pega en `sonar-project.properties`, comandos compartidos ni
+archivos versionados. La clave `ejecu-catalogo-grupo2` ya esta configurada en el
+archivo de propiedades. El pipeline normaliza espacios accidentales y enmascara
+el token antes de usarlo, siguiendo la idea del ejemplo sin insertarlo directamente
+en el codigo del script de shell.
+
+## 4. Pipeline
+
+Los tres jobs usan runners de GitHub, no `self-hosted`:
+
+- `calidad`: formato, lint, tipos, build, pruebas, contrato, E2E con cobertura,
+  comprobacion de URL publica, SonarQube Scan y Quality Gate.
+- `seguridad`: Gitleaks por Docker, govulncheck, auditoria npm, Hadolint y Trivy fs.
+- `imagen`: espera calidad y seguridad, construye API/web/migraciones y analiza
+  las imagenes API y web con Trivy y API con Dockle.
+
+Los cambios se revisan en PR; main permanece protegida. Tras integrar el workflow,
+Actions > ci permite ejecutar manualmente con Run workflow o se inicia al hacer
+push a main y abrir/actualizar PR. Mantener Docker Desktop, SonarQube y el tunel
+encendidos durante el analisis; puede detenerse el runner personal con Ctrl+C.
+
+Community Build no ofrece analisis nativo de PR. El ejemplo tambien utiliza
+Community y, por tanto, no elimina esa limitacion: para cumplir completamente el
+DAS hay que acordar una edicion compatible o una alternativa aprobada. No se
+omite SonarQube en PR ni se acepta un Quality Gate fallido.
+
+## 5. Detener y conservar los datos
+
+Para cerrar el acceso publico al terminar:
+
+```powershell
+docker compose --env-file .env.sonar -f compose.sonarqube.yaml stop sonar-tunnel
+```
+
+Para detener tambien SonarQube y su base:
+
+```powershell
+docker compose --env-file .env.sonar -f compose.sonarqube.yaml stop sonarqube sonar-db
+```
+
+No usar `down -v`: elimina los datos persistentes. No compartir la salida de
+`docker compose config` porque expande la clave de PostgreSQL.
 
 ## Referencias
 
-- [Imagen oficial y versiones](https://hub.docker.com/_/sonarqube).
-- [Instalación con Docker](https://docs.sonarsource.com/sonarqube-community-build/server-installation/from-docker-image/set-up-and-start-container).
-- [Requisitos Linux](https://docs.sonarsource.com/sonarqube-community-build/server-installation/pre-installation/linux).
-- [Funciones por edición](https://docs.sonarsource.com/sonarqube-community-build/feature-comparison-table).
-
-## Runner Ubuntu del equipo
-
-El workflow de esta rama usa las etiquetas predeterminadas `[self-hosted, Linux, X64]`,
-porque el runner se registró sin etiqueta adicional. Los tres jobs necesitan ese
-runner disponible; deben mantenerse Ubuntu, `./run.sh` y Docker Desktop activos.
-La configuración inicial comprueba Docker y la URL de SonarQube sin mostrar el token.
-
-Desde una segunda terminal Ubuntu, comprobar `docker info` y
-`curl --max-time 30 http://localhost:9000/api/system/status` antes de ejecutar.
-Si responde UP, guardar `http://localhost:9000` como `SONAR_HOST_URL`. Esto solo es
-válido para este runner local.
-
-El evento `workflow_dispatch` permite ejecutar manualmente CI una vez que el archivo
-esté integrado en la rama principal. El análisis de PR sigue requiriendo una edición
-compatible; cambiar el runner no añade esa función a Community Build.
+- [Imagen oficial SonarQube](https://hub.docker.com/_/sonarqube).
+- [Docker Compose para SonarQube](https://docs.sonarsource.com/sonarqube-community-build/server-installation/from-docker-image/set-up-and-start-container).
+- [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
+- [Funciones por edicion SonarQube](https://docs.sonarsource.com/sonarqube-community-build/feature-comparison-table).

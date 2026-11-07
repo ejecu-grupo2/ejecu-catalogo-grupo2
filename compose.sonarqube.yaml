@@ -38,6 +38,17 @@ services:
       nproc: 8192
     restart: unless-stopped
 
+  sonar-tunnel:
+    image: cloudflare/cloudflared:2026.10.7@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba
+    profiles: [tunnel]
+    depends_on:
+      sonarqube:
+        condition: service_started
+    command: [tunnel, --no-autoupdate, --url, 'http://sonarqube:9000']
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+
 volumes:
   sonar_postgres:
   sonar_data:
