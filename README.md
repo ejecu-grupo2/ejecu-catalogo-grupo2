@@ -4,7 +4,7 @@ Base de trabajo construida desde las reglas del DAS. No es una plantilla oficial
 
 ## Requisitos
 
-Go 1.26.5, Node 22.22.0, pnpm 10.13.1, Docker Desktop iniciado y Gitleaks 8.30.1. Las versiones del DAS se mantienen exactas.
+Go 1.26.10, Node 22.22.0, pnpm 10.13.1, Docker Desktop iniciado y Gitleaks 8.30.1. Las versiones se fijan exactamente; los parches de seguridad respecto al DAS original se registran en [actualizaciones de dependencias](docs/actualizaciones-dependencias.md).
 
 ## Preparación
 
