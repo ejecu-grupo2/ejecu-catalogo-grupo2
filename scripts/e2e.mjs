@@ -63,7 +63,15 @@ try {
     let listo = false
     for (let i = 0; i < 60; i++) {
       try {
-        ejecutar('docker', ['exec', contenedor, 'pg_isready', '-U', 'postgres'])
+        ejecutar('docker', [
+          'exec',
+          contenedor,
+          'pg_isready',
+          '-h',
+          '127.0.0.1',
+          '-U',
+          'postgres',
+        ])
         listo = true
         break
       } catch {}

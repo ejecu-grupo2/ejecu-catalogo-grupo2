@@ -1,0 +1,56 @@
+name: ejecu-grupo2-sonarqube
+
+services:
+  sonar-db:
+    image: postgres:17.11@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_DB: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:?Ejecutar scripts/preparar-sonarqube.ps1}
+    volumes:
+      - sonar_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U sonar -d sonar']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:26.11.0.134175-community@sha256:1ce197471f5f2bac347694a336862fd2c23e9f57c6edb46acebbfbe70f2c7d9c
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:?Ejecutar scripts/preparar-sonarqube.ps1}
+    ports:
+      - '127.0.0.1:9000:9000'
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_extensions:/opt/sonarqube/extensions
+      - sonar_logs:/opt/sonarqube/logs
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+      nproc: 8192
+    restart: unless-stopped
+
+  sonar-tunnel:
+    image: cloudflare/cloudflared:2026.10.7@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba
+    profiles: [tunnel]
+    depends_on:
+      sonarqube:
+        condition: service_started
+    command: [tunnel, --no-autoupdate, --url, 'http://sonarqube:9000']
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+
+volumes:
+  sonar_postgres:
+  sonar_data:
+  sonar_extensions:
+  sonar_logs:

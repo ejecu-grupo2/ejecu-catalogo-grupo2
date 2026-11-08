@@ -4,7 +4,7 @@ Base de trabajo construida desde las reglas del DAS. No es una plantilla oficial
 
 ## Requisitos
 
-Go 1.26.5, Node 22.22.0, pnpm 10.13.1, Docker Desktop iniciado y Gitleaks 8.30.1. Las versiones del DAS se mantienen exactas.
+Go 1.26.10, Node 22.22.0, pnpm 10.13.1, Docker Desktop iniciado y Gitleaks 8.30.1. Las versiones se fijan exactamente; los parches de seguridad respecto al DAS original se registran en [actualizaciones de dependencias](docs/actualizaciones-dependencias.md).
 
 ## Preparación
 
@@ -37,6 +37,8 @@ El E2E usa un contenedor PostgreSQL efímero o `TEST_DATABASE_URL`, inicia el bi
 `pnpm codegen` genera `contracts/openapi.yaml` y `apps/web/src/api/schema.d.ts`; ambos se commitean. `make generate` en `apps/api` genera el repositorio SQL con sqlc. Handler → Service → Store es la estructura de las futuras funciones de negocio. `/api/estado` solo informa el estado de esta base; no expone datos del catálogo.
 
 ## GitHub y SonarQube
+
+Para conectar SonarQube local con los runners de GitHub mediante el túnel HTTPS del ejemplo, seguir [esta guía](docs/sonarqube-docker.md).
 
 La CI exige `calidad`, `seguridad` e `imagen`. No se omite SonarQube si faltan sus secrets: calidad quedará bloqueado hasta configurar el proyecto. Ver `docs/solicitud-sonarqube.md`.
 

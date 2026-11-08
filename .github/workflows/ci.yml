@@ -1,5 +1,6 @@
 name: ci
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main]
@@ -16,6 +17,7 @@ env:
 jobs:
   calidad:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0 }
@@ -23,7 +25,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version-file: .nvmrc, cache: pnpm }
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with: { go-version-file: apps/api/go.mod }
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
       - run: pnpm install --frozen-lockfile
       - run: cd apps/api && go mod verify
       - run: pnpm verify
@@ -35,24 +39,45 @@ jobs:
           git show origin/main:contracts/openapi.yaml > /tmp/base.yaml
           go run github.com/oasdiff/oasdiff@${OASDIFF_VERSION} breaking /tmp/base.yaml contracts/openapi.yaml --fail-on ERR
       - run: pnpm test:e2e:api # binario con -cover, deja cobertura en GOCOVERDIR
+      - name: Preparar conexion SonarQube
+        env:
+          INPUT_SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          INPUT_SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          CLEAN_URL=$(printf '%s' "$INPUT_SONAR_HOST_URL" | tr -d '[:space:]')
+          CLEAN_TOKEN=$(printf '%s' "$INPUT_SONAR_TOKEN" | tr -d '[:space:]')
+          test -n "$CLEAN_TOKEN" || { echo 'Falta SONAR_TOKEN en Actions Secrets'; exit 1; }
+          echo "::add-mask::$CLEAN_TOKEN"
+          case "$CLEAN_URL" in
+            https://*) ;;
+            *) echo 'SONAR_HOST_URL debe ser la URL HTTPS del tunel, no localhost'; exit 1 ;;
+          esac
+          printf 'SONAR_HOST_URL=%s\nSONAR_TOKEN=%s\n' "$CLEAN_URL" "$CLEAN_TOKEN" >> "$GITHUB_ENV"
+          curl --fail --silent --show-error --max-time 30 "${CLEAN_URL%/}/api/system/status" | python3 -c 'import json,sys; s=json.load(sys.stdin); print("SonarQube:", s.get("status")); sys.exit(0 if s.get("status")=="UP" else 1)'
       - uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
       - uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1.2.1
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
 
   seguridad:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0 }
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with: { go-version-file: apps/api/go.mod }
-      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+      - name: Gitleaks detect
         env:
-          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_VERSION: v8.30.1
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/path:ro" "zricethezav/gitleaks:${GITLEAKS_VERSION}" detect --source=/path --config=/path/.gitleaks.toml --redact --no-banner
       - uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version-file: .nvmrc }
@@ -73,6 +98,7 @@ jobs:
   imagen:
     needs: [calidad, seguridad]
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker build --pull -f apps/api/Dockerfile --build-arg VERSION=${GITHUB_SHA::7} -t api:ci .
