@@ -1,12 +1,22 @@
 # Catálogo · Grupo 2
 
-Base de trabajo construida desde las reglas del DAS. No es una plantilla oficial entregada por el curso ni implementa todavía el dominio del catálogo.
+Repositorio del servicio de catálogo para el curso DAS. Está preparado el entorno
+con Go, React y PostgreSQL, junto con Docker y el pipeline de GitHub Actions.
+Las funciones propias del catálogo todavía están pendientes.
 
 ## Requisitos
 
-Go 1.26.10, Node 22.22.0, pnpm 10.13.1, Docker Desktop iniciado y Gitleaks 8.30.1. Las versiones se fijan exactamente; los parches de seguridad respecto al DAS original se registran en [actualizaciones de dependencias](docs/actualizaciones-dependencias.md).
+- Go 1.26.10
+- Node.js 22.22.0 y pnpm 10.13.1
+- Docker Desktop con contenedores Linux
+- Gitleaks 8.30.1 para el control de secretos en los commits
 
-## Preparación
+Las versiones están fijadas en el proyecto. Los cambios de seguridad respecto al
+DAS original se registran en [actualizaciones de dependencias](docs/actualizaciones-dependencias.md).
+
+## Levantar el proyecto
+
+Desde la carpeta del repositorio:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -16,15 +26,43 @@ go mod download
 cd ../..
 ```
 
-Copiar `.env.example` a `.env`, reemplazar usuario, contraseña, base y URLs. Los valores de DATABASE_URL deben coincidir con POSTGRES_USER, POSTGRES_PASSWORD y POSTGRES_DB. No subir `.env` al repositorio.
+Copia `.env.example` a `.env` y completa los valores. En PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+El usuario, la contraseña y el nombre de la base en `DATABASE_URL` deben coincidir
+con `POSTGRES_USER`, `POSTGRES_PASSWORD` y `POSTGRES_DB`. Dentro de Docker, el host
+de la base es `postgres`. El archivo `.env` no se sube al repositorio.
+
+Con Docker Desktop abierto:
 
 ```sh
 docker compose up -d --build
 ```
 
-Web: http://localhost:5120. API: http://localhost:5121. Documentación: http://localhost:5121/api/docs. Los puertos 5120/5121 son provisionales: confirmar el número N del servicio con el profesor.
+| Servicio                | Dirección local                |
+| ----------------------- | ------------------------------ |
+| Frontend                | http://localhost:5120          |
+| API                     | http://localhost:5121          |
+| Documentación de la API | http://localhost:5121/api/docs |
 
-## Validación
+Los puertos 5120 y 5121 son los actuales. Falta confirmar el número de servicio
+asignado al grupo para dejar el rango definitivo.
+
+## Organización del código
+
+- `apps/api`: backend Go, separado en handlers, servicios y acceso a PostgreSQL.
+- `apps/web`: frontend React y componente que consulta el estado de la API.
+- `contracts/openapi.yaml`: contrato generado desde los handlers de Huma.
+- `docs`: reglas del curso, modos de falla e instrucciones de configuración.
+
+La API expone `/healthz` para comprobar que el proceso está activo, `/readyz` para
+comprobar PostgreSQL y `/api/estado` para consultar el estado del servicio. Aún no
+hay endpoints de negocio del catálogo.
+
+## Comprobaciones antes de subir cambios
 
 ```sh
 pnpm verify
@@ -32,26 +70,46 @@ pnpm codegen
 pnpm test:e2e:api
 ```
 
-El E2E usa un contenedor PostgreSQL efímero o `TEST_DATABASE_URL`, inicia el binario real y compara un reporte golden. Es una prueba de infraestructura; los escenarios de negocio se agregarán cuando se conozca el contrato. La cobertura Go se obtiene del binario compilado con `-cover` y la del frontend de Vitest.
+`pnpm verify` revisa formato, lint, tipos, pruebas y compilación. El E2E necesita
+Docker: levanta PostgreSQL, ejecuta la API real y compara el resultado con el
+reporte golden. También puede usar una base indicada en `TEST_DATABASE_URL`.
 
-`pnpm codegen` genera `contracts/openapi.yaml` y `apps/web/src/api/schema.d.ts`; ambos se commitean. `make generate` en `apps/api` genera el repositorio SQL con sqlc. Handler → Service → Store es la estructura de las futuras funciones de negocio. `/api/estado` solo informa el estado de esta base; no expone datos del catálogo.
+Después de cambiar el contrato, `pnpm codegen` actualiza el OpenAPI y los tipos de
+`apps/web/src/api/schema.d.ts`. Ambos archivos se incluyen en el commit.
+Las consultas SQL se generan con `make generate` desde `apps/api`.
 
-## GitHub y SonarQube
+## CI y SonarQube
 
-Para conectar SonarQube local con los runners de GitHub mediante el túnel HTTPS del ejemplo, seguir [esta guía](docs/sonarqube-docker.md).
+Cada PR y cada push a `main` ejecuta tres jobs:
 
-La CI exige `calidad`, `seguridad` e `imagen`. No se omite SonarQube si faltan sus secrets: calidad quedará bloqueado hasta configurar el proyecto. Ver `docs/solicitud-sonarqube.md`.
+- `calidad`: validaciones del código, contrato, E2E y Quality Gate de SonarQube.
+- `seguridad`: Gitleaks, auditoría de dependencias, govulncheck, Hadolint y Trivy.
+- `imagen`: construcción y revisión de las imágenes Docker.
 
-Después del primer push, configurar protección de `main`: PR obligatorio, al menos una aprobación de otra persona y los tres checks requeridos. No habilitar bypass para integrar PR con fallas.
+`main` está protegida. Los cambios entran por PR, con al menos una aprobación de
+otra persona del grupo y los tres checks en verde.
 
-## Pendientes del Hito 0
+SonarQube corre en Docker y GitHub accede mediante un túnel HTTPS de Cloudflare.
+La clave del proyecto es `ejecu-catalogo-grupo2`. El token y la URL del túnel se
+guardan como `SONAR_TOKEN` y `SONAR_HOST_URL` en Actions Secrets.
+Para iniciarlo o recuperar la conexión después de apagar el equipo, sigue la
+[guía de SonarQube](docs/sonarqube-docker.md).
 
-- Confirmar número del servicio, alcance y dependencias con el documento de componentes.
-- Crear SonarQube y cargar SONAR_TOKEN y SONAR_HOST_URL directamente en GitHub Actions Secrets.
-- Confirmar la clave SonarQube propuesta y definir New Code y Quality Gate.
-- Agregar seed cuando exista esquema de catálogo y app de desarrollo con mocks MSW.
-- Completar autenticación JWT/JWKS, permisos y logs por request antes de agregar endpoints de negocio.
-- Publicación del paquete UI, SBOM y firma de imágenes pendiente.
-- Ejecutar Docker, escáneres y pipeline; guardar los enlaces de evidencia y proteger main.
+La [validación de main del 8 de noviembre de 2026](https://github.com/ejecu-grupo2/ejecu-catalogo-grupo2/actions/runs/42519179046)
+terminó con los tres jobs aprobados. El primer análisis de SonarQube obtuvo un
+Quality Gate aprobado, 67,5% de cobertura, 0% de duplicación y cero issues.
 
-Reglas completas: [DAS](docs/DAS.md). Modos de falla: [documento](docs/modos-de-falla.md).
+## Trabajo pendiente
+
+- Definir el modelo, los endpoints y las dependencias del catálogo.
+- Incorporar autenticación JWT/JWKS y permisos en los endpoints de negocio.
+- Preparar datos de demostración y mocks MSW.
+- Completar la publicación del paquete de componentes, el SBOM y la firma de imágenes.
+- Acordar el análisis nativo de PR exigido por el DAS, que Community Build no incluye.
+
+## Documentación
+
+- [Lineamientos DAS](docs/DAS.md)
+- [Modos de falla](docs/modos-de-falla.md)
+- [SonarQube con Docker y Cloudflare](docs/sonarqube-docker.md)
+- [Actualizaciones de dependencias](docs/actualizaciones-dependencias.md)
