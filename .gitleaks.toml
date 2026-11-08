@@ -1,0 +1,12 @@
+title = "Catalogo: reglas de secretos"
+
+[extend]
+useDefault = true
+
+# Identificador publico de SonarQube, no es un token de autenticacion.
+# Solo se permite esta linea exacta; no se excluyen archivos ni commits.
+[[allowlists]]
+description = "Clave publica estable del proyecto SonarQube"
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+regexes = ['''^sonar\.projectKey=ejecu-catalogo-grupo2$''']
