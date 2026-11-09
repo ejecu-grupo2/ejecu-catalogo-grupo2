@@ -4,6 +4,66 @@
  */
 
 export interface paths {
+    "/api/catalogo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar productos vendibles
+         * @description Retorna los productos con stock disponible para la venta, con filtro opcional por categoría.
+         */
+        get: operations["consultar-catalogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalogo/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detalle de un producto en catálogo
+         * @description Obtiene los detalles comerciales y disponibilidad de inventario de un producto específico.
+         */
+        get: operations["obtener-item-catalogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/categorias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar categorías del catálogo
+         * @description Retorna las categorías de productos disponibles.
+         */
+        get: operations["consultar-categorias"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/estado": {
         parameters: {
             query?: never;
@@ -25,6 +85,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Categoria: {
+            /**
+             * @description Identificador de la categoría
+             * @example perifericos
+             */
+            id: string;
+            /**
+             * @description Nombre visible
+             * @example Periféricos
+             */
+            nombre: string;
+        };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
             location?: string;
@@ -82,6 +154,66 @@ export interface components {
             estado: string;
             servicio: string;
         };
+        ItemCatalogo: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/api/schemas/ItemCatalogo.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: date-time
+             * @description Última actualización de datos
+             */
+            actualizado_en: string;
+            /**
+             * @description Categoría a la que pertenece
+             * @example Periféricos
+             */
+            categoria: string;
+            /**
+             * @description Detalle del producto
+             * @example Switches táctiles y retroiluminación
+             */
+            descripcion: string;
+            /**
+             * @description Indica si tiene stock para compra inmediata
+             * @example true
+             */
+            disponible: boolean;
+            /**
+             * @description Identificador único del producto
+             * @example prod-101
+             */
+            id: string;
+            /**
+             * @description Moneda en formato ISO 4217
+             * @example CLP
+             */
+            moneda: string;
+            /**
+             * @description Nombre comercial
+             * @example Teclado Mecánico RGB
+             */
+            nombre: string;
+            /**
+             * Format: int64
+             * @description Precio final de venta en pesos (CLP)
+             * @example 49990
+             */
+            precio: number;
+            /**
+             * @description Código único de referencia
+             * @example ELEC-001
+             */
+            sku: string;
+            /**
+             * Format: int64
+             * @description Unidades disponibles en inventario
+             * @example 15
+             */
+            stock: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -91,6 +223,102 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    "consultar-catalogo": {
+        parameters: {
+            query?: {
+                /** @description Filtrar por nombre de categoría */
+                categoria?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemCatalogo"][] | null;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "obtener-item-catalogo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Identificador único del producto
+                 * @example prod-101
+                 */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemCatalogo"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "consultar-categorias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Categoria"][] | null;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "estado-catalogo": {
         parameters: {
             query?: never;
