@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/JohannySimken/ejecu-catalogo-grupo2/apps/api/internal/service"
@@ -20,7 +22,7 @@ type SalidaConsultarCatalogo struct {
 
 // EntradaDetalleItemCatalogo define el parámetro de ruta.
 type EntradaDetalleItemCatalogo struct {
-	ID string `path:"id" example:"prod-101" doc:"Identificador único del producto"`
+	ID string `path:"id" format:"uuid" example:"3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60" doc:"Identificador único del producto (UUID)"`
 }
 
 // SalidaDetalleItemCatalogo devuelve el detalle del producto.
@@ -46,7 +48,8 @@ func RegistrarCatalogo(servidor huma.API) {
 	}, func(ctx context.Context, entrada *EntradaConsultarCatalogo) (*SalidaConsultarCatalogo, error) {
 		items, err := service.ConsultarCatalogo(ctx, entrada.Categoria)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Error al consultar el catálogo", err)
+			slog.ErrorContext(ctx, "Error al consultar el catálogo", "error", err)
+			return nil, huma.Error500InternalServerError("Error al consultar el catálogo")
 		}
 		return &SalidaConsultarCatalogo{Body: items}, nil
 	})
@@ -62,10 +65,11 @@ func RegistrarCatalogo(servidor huma.API) {
 	}, func(ctx context.Context, entrada *EntradaDetalleItemCatalogo) (*SalidaDetalleItemCatalogo, error) {
 		item, err := service.ObtenerItemCatalogo(ctx, entrada.ID)
 		if err != nil {
-			if err == service.ErrProductoNoEncontrado {
+			if errors.Is(err, service.ErrProductoNoEncontrado) {
 				return nil, huma.Error404NotFound("Producto no encontrado en el catálogo")
 			}
-			return nil, huma.Error500InternalServerError("Error al obtener detalle del producto", err)
+			slog.ErrorContext(ctx, "Error al obtener detalle del producto", "error", err)
+			return nil, huma.Error500InternalServerError("Error al obtener detalle del producto")
 		}
 		return &SalidaDetalleItemCatalogo{Body: item}, nil
 	})
@@ -81,7 +85,8 @@ func RegistrarCatalogo(servidor huma.API) {
 	}, func(ctx context.Context, entrada *struct{}) (*SalidaConsultarCategorias, error) {
 		categorias, err := service.ConsultarCategorias(ctx)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Error al consultar categorías", err)
+			slog.ErrorContext(ctx, "Error al consultar categorías", "error", err)
+			return nil, huma.Error500InternalServerError("Error al consultar categorías")
 		}
 		return &SalidaConsultarCategorias{Body: categorias}, nil
 	})

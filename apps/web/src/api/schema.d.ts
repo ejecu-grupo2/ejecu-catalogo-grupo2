@@ -87,8 +87,9 @@ export interface components {
     schemas: {
         Categoria: {
             /**
-             * @description Identificador de la categoría
-             * @example perifericos
+             * Format: uuid
+             * @description Identificador de la categoría (UUID)
+             * @example 6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e
              */
             id: string;
             /**
@@ -182,8 +183,9 @@ export interface components {
              */
             disponible: boolean;
             /**
-             * @description Identificador único del producto
-             * @example prod-101
+             * Format: uuid
+             * @description Identificador único del producto (UUID)
+             * @example 3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60
              */
             id: string;
             /**
@@ -261,8 +263,8 @@ export interface operations {
             header?: never;
             path: {
                 /**
-                 * @description Identificador único del producto
-                 * @example prod-101
+                 * @description Identificador único del producto (UUID)
+                 * @example 3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60
                  */
                 id: string;
             };

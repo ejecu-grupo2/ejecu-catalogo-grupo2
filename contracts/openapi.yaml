@@ -4,9 +4,10 @@ components:
       additionalProperties: false
       properties:
         id:
-          description: Identificador de la categoría
+          description: Identificador de la categoría (UUID)
           examples:
-            - perifericos
+            - 6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e
+          format: uuid
           type: string
         nombre:
           description: Nombre visible
@@ -124,9 +125,10 @@ components:
             - true
           type: boolean
         id:
-          description: Identificador único del producto
+          description: Identificador único del producto (UUID)
           examples:
-            - prod-101
+            - 3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60
+          format: uuid
           type: string
         moneda:
           description: Moneda en formato ISO 4217
@@ -209,15 +211,16 @@ paths:
       description: Obtiene los detalles comerciales y disponibilidad de inventario de un producto específico.
       operationId: obtener-item-catalogo
       parameters:
-        - description: Identificador único del producto
-          example: prod-101
+        - description: Identificador único del producto (UUID)
+          example: 3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60
           in: path
           name: id
           required: true
           schema:
-            description: Identificador único del producto
+            description: Identificador único del producto (UUID)
             examples:
-              - prod-101
+              - 3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60
+            format: uuid
             type: string
       responses:
         "200":

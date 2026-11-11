@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/JohannySimken/ejecu-catalogo-grupo2/apps/api/internal/service"
@@ -45,18 +46,19 @@ func TestObtenerItemCatalogo(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("producto existente", func(t *testing.T) {
-		item, err := service.ObtenerItemCatalogo(ctx, "prod-101")
+		const id = "3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60"
+		item, err := service.ObtenerItemCatalogo(ctx, id)
 		if err != nil {
 			t.Fatalf("error inesperado: %v", err)
 		}
-		if item.ID != "prod-101" {
+		if item.ID != id {
 			t.Errorf("id incorrecto: %s", item.ID)
 		}
 	})
 
 	t.Run("producto inexistente", func(t *testing.T) {
-		_, err := service.ObtenerItemCatalogo(ctx, "inexistente")
-		if err != service.ErrProductoNoEncontrado {
+		_, err := service.ObtenerItemCatalogo(ctx, "00000000-0000-4000-8000-000000000000")
+		if !errors.Is(err, service.ErrProductoNoEncontrado) {
 			t.Fatalf("esperado ErrProductoNoEncontrado, obtenido: %v", err)
 		}
 	})
