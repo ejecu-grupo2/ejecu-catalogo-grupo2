@@ -7,7 +7,7 @@ COPY apps/web/package.json apps/web/package.json
 RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile --ignore-scripts --store-dir /pnpm/store
 COPY apps/web/ apps/web/
 RUN pnpm build
-FROM --platform=$BUILDPLATFORM golang:1.26.10-alpine3.23@sha256:78e7f1e419545bc4b8b5ee8a40a99ddb5df1216d38681dbab2eeb1fdb2427f43 AS server
+FROM --platform=$BUILDPLATFORM golang:1.26.11-alpine3.23@sha256:db99415e2625ce0ee03eed09edf7f32ae8c58dc399f28cc602a87fe7238119e4 AS server
 WORKDIR /src
 COPY apps/web/server/ ./
 ARG TARGETOS TARGETARCH
