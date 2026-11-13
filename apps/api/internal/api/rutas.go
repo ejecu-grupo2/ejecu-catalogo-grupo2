@@ -25,6 +25,10 @@ func Registrar(mux *http.ServeMux, entorno string, db Disponibilidad) huma.API {
 	huma.Register(servidor, huma.Operation{OperationID: "estado-catalogo", Method: http.MethodGet, Path: "/api/estado", Summary: "Estado de la plantilla, sin datos de negocio"}, func(ctx context.Context, entrada *struct{}) (*Salida, error) {
 		return &Salida{Body: service.ConsultarEstado()}, nil
 	})
+
+	// Conectar rutas del catálogo
+	RegistrarCatalogo(servidor)
+
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2_000_000_000)

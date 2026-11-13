@@ -1,5 +1,23 @@
 components:
   schemas:
+    Categoria:
+      additionalProperties: false
+      properties:
+        id:
+          description: Identificador de la categoría (UUID)
+          examples:
+            - 6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e
+          format: uuid
+          type: string
+        nombre:
+          description: Nombre visible
+          examples:
+            - Periféricos
+          type: string
+      required:
+        - id
+        - nombre
+      type: object
     ErrorDetail:
       additionalProperties: false
       properties:
@@ -77,11 +95,173 @@ components:
         - servicio
         - estado
       type: object
+    ItemCatalogo:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/api/schemas/ItemCatalogo.json
+          format: uri
+          readOnly: true
+          type: string
+        actualizado_en:
+          description: Última actualización de datos
+          format: date-time
+          type: string
+        categoria:
+          description: Categoría a la que pertenece
+          examples:
+            - Periféricos
+          type: string
+        descripcion:
+          description: Detalle del producto
+          examples:
+            - Switches táctiles y retroiluminación
+          type: string
+        disponible:
+          description: Indica si tiene stock para compra inmediata
+          examples:
+            - true
+          type: boolean
+        id:
+          description: Identificador único del producto (UUID)
+          examples:
+            - 3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60
+          format: uuid
+          type: string
+        moneda:
+          description: Moneda en formato ISO 4217
+          examples:
+            - CLP
+          type: string
+        nombre:
+          description: Nombre comercial
+          examples:
+            - Teclado Mecánico RGB
+          type: string
+        precio:
+          description: Precio final de venta en pesos (CLP)
+          examples:
+            - 49990
+          format: int64
+          type: integer
+        sku:
+          description: Código único de referencia
+          examples:
+            - ELEC-001
+          type: string
+        stock:
+          description: Unidades disponibles en inventario
+          examples:
+            - 15
+          format: int64
+          type: integer
+      required:
+        - id
+        - sku
+        - nombre
+        - descripcion
+        - categoria
+        - precio
+        - moneda
+        - stock
+        - disponible
+        - actualizado_en
+      type: object
 info:
   title: Catálogo
   version: 0.1.0
 openapi: 3.1.0
 paths:
+  /api/catalogo:
+    get:
+      description: Retorna los productos con stock disponible para la venta, con filtro opcional por categoría.
+      operationId: consultar-catalogo
+      parameters:
+        - description: Filtrar por nombre de categoría
+          explode: false
+          in: query
+          name: categoria
+          schema:
+            description: Filtrar por nombre de categoría
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/ItemCatalogo"
+                type:
+                  - array
+                  - "null"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Listar productos vendibles
+      tags:
+        - Catálogo
+  /api/catalogo/{id}:
+    get:
+      description: Obtiene los detalles comerciales y disponibilidad de inventario de un producto específico.
+      operationId: obtener-item-catalogo
+      parameters:
+        - description: Identificador único del producto (UUID)
+          example: 3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60
+          in: path
+          name: id
+          required: true
+          schema:
+            description: Identificador único del producto (UUID)
+            examples:
+              - 3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemCatalogo"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Detalle de un producto en catálogo
+      tags:
+        - Catálogo
+  /api/categorias:
+    get:
+      description: Retorna las categorías de productos disponibles.
+      operationId: consultar-categorias
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/Categoria"
+                type:
+                  - array
+                  - "null"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Listar categorías del catálogo
+      tags:
+        - Catálogo
   /api/estado:
     get:
       operationId: estado-catalogo
