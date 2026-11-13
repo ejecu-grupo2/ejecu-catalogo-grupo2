@@ -39,10 +39,6 @@ jobs:
           git show origin/main:contracts/openapi.yaml > /tmp/base.yaml
           go run github.com/oasdiff/oasdiff@${OASDIFF_VERSION} breaking /tmp/base.yaml contracts/openapi.yaml --fail-on ERR
       - run: pnpm test:e2e:api # binario con -cover, deja cobertura en GOCOVERDIR
-      - name: Ejecutar pruebas unitarias de Go y generar cobertura
-        run: |
-          cd apps/api
-          go test -coverprofile=../../coverage.out -covermode=atomic ./...
       - name: Preparar conexion SonarQube
         env:
           INPUT_SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

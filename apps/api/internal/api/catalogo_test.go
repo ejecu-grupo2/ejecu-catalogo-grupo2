@@ -27,16 +27,23 @@ func TestCatalogoEndpoints(t *testing.T) {
 	})
 
 	t.Run("GET /api/catalogo/{id} responde 200 si existe", func(t *testing.T) {
-		resp := humaApi.Get("/api/catalogo/prod-101")
+		resp := humaApi.Get("/api/catalogo/3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60")
 		if resp.Code != http.StatusOK {
 			t.Fatalf("se esperaba status 200, obtenido %d", resp.Code)
 		}
 	})
 
 	t.Run("GET /api/catalogo/{id} responde 404 si no existe", func(t *testing.T) {
-		resp := humaApi.Get("/api/catalogo/id-inexistente")
+		resp := humaApi.Get("/api/catalogo/00000000-0000-4000-8000-000000000000")
 		if resp.Code != http.StatusNotFound {
 			t.Fatalf("se esperaba status 404, obtenido %d", resp.Code)
+		}
+	})
+
+	t.Run("GET /api/catalogo/{id} responde 422 si el id no es UUID", func(t *testing.T) {
+		resp := humaApi.Get("/api/catalogo/prod-101")
+		if resp.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("se esperaba status 422, obtenido %d", resp.Code)
 		}
 	})
 
