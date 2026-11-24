@@ -1,0 +1,7 @@
+# Cliente Go del Servicio de Stock (grupo 8), generado desde
+# contracts/externos/stock.yaml. Regenerar con `make clientes` en apps/api.
+package: stock
+output: internal/clientes/stock/stock.gen.go
+generate:
+  models: true
+  client: true

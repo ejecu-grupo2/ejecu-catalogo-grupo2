@@ -42,6 +42,25 @@ services:
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     read_only: true
+  # Mock del servicio para testing (se puede quitar si se necesita)
+  stock-mock:
+    image: node:22.22.0-alpine3.23@sha256:e4bf2a82ad0a4037d28035ae71529873c069b13eb0455466ae0bc13363826e34
+    profiles: [dev]
+    working_dir: /contratos
+    volumes: ['./contracts/externos:/contratos:ro']
+    command:
+      [
+        npx,
+        --yes,
+        '@stoplight/prism-cli@5.16.0',
+        mock,
+        -h,
+        0.0.0.0,
+        -p,
+        '4010',
+        stock.yaml,
+      ]
+    ports: ['127.0.0.1:4010:4010']
   mailpit:
     image: axllent/mailpit:v1.31.3@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
     profiles: [dev]

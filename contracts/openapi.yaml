@@ -110,10 +110,18 @@ components:
           format: date-time
           type: string
         categoria:
-          description: Categoría a la que pertenece
+          deprecated: true
+          description: "Obsoleto: usar categoria_ids. Nombre de la categoría; el Servicio de Productos no lo entrega"
           examples:
             - Periféricos
           type: string
+        categoria_ids:
+          description: Identificadores UUID de las categorías a las que pertenece
+          examples:
+            - - 6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e
+          items:
+            type: string
+          type: array
         descripcion:
           description: Detalle del producto
           examples:
@@ -141,7 +149,7 @@ components:
             - Teclado Mecánico RGB
           type: string
         precio:
-          description: Precio final de venta en pesos (CLP)
+          description: Precio final de venta en pesos (CLP), IVA incluido
           examples:
             - 49990
           format: int64
@@ -162,6 +170,7 @@ components:
         - sku
         - nombre
         - descripcion
+        - categoria_ids
         - categoria
         - precio
         - moneda
@@ -169,6 +178,17 @@ components:
         - disponible
         - actualizado_en
       type: object
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      description: Mismo JWT, reenviado entre servicios.
+      scheme: bearer
+      type: http
+    cookieAuth:
+      description: JWT emitido por el servicio de identidad en cookie HttpOnly, Secure, SameSite=Lax. Confirmar el nombre de la cookie.
+      in: cookie
+      name: sesion
+      type: apiKey
 info:
   title: Catálogo
   version: 0.1.0
@@ -176,16 +196,50 @@ openapi: 3.1.0
 paths:
   /api/catalogo:
     get:
-      description: Retorna los productos con stock disponible para la venta, con filtro opcional por categoría.
+      description: Retorna los productos que se pueden vender y tienen stock, según el Servicio de Stock, con filtro opcional por categoría y paginación. El total va en el encabezado X-Total-Count.
       operationId: consultar-catalogo
       parameters:
-        - description: Filtrar por nombre de categoría
+        - description: Filtrar por categoría (UUID)
+          example: 6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e
+          explode: false
+          in: query
+          name: categoria_id
+          schema:
+            description: Filtrar por categoría (UUID)
+            examples:
+              - 6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e
+            format: uuid
+            type: string
+        - deprecated: true
+          description: "Obsoleto: usar categoria_id. Filtrar por nombre de categoría"
           explode: false
           in: query
           name: categoria
           schema:
-            description: Filtrar por nombre de categoría
+            deprecated: true
+            description: "Obsoleto: usar categoria_id. Filtrar por nombre de categoría"
             type: string
+        - description: Número de página, desde 1
+          explode: false
+          in: query
+          name: pagina
+          schema:
+            default: 1
+            description: Número de página, desde 1
+            format: int64
+            minimum: 1
+            type: integer
+        - description: Productos por página
+          explode: false
+          in: query
+          name: tamano
+          schema:
+            default: 20
+            description: Productos por página
+            format: int64
+            maximum: 100
+            minimum: 1
+            type: integer
       responses:
         "200":
           content:
@@ -197,18 +251,49 @@ paths:
                   - array
                   - "null"
           description: OK
-        default:
+          headers:
+            X-Total-Count:
+              schema:
+                description: Cantidad total de productos vendibles que cumplen el filtro
+                format: int64
+                type: integer
+        "401":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
-          description: Error
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Forbidden
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Internal Server Error
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Service Unavailable
       summary: Listar productos vendibles
       tags:
         - Catálogo
+      x-permiso: catalogo:operar
   /api/catalogo/{id}:
     get:
-      description: Obtiene los detalles comerciales y disponibilidad de inventario de un producto específico.
+      description: Obtiene los detalles comerciales y el stock de un producto vendible. Responde 404 si el producto no existe, no se puede vender o no tiene stock.
       operationId: obtener-item-catalogo
       parameters:
         - description: Identificador único del producto (UUID)
@@ -229,15 +314,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/ItemCatalogo"
           description: OK
-        default:
+        "401":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
-          description: Error
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Not Found
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Internal Server Error
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Service Unavailable
       summary: Detalle de un producto en catálogo
       tags:
         - Catálogo
+      x-permiso: catalogo:operar
   /api/categorias:
     get:
       description: Retorna las categorías de productos disponibles.
@@ -253,15 +369,28 @@ paths:
                   - array
                   - "null"
           description: OK
-        default:
+        "401":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
-          description: Error
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Forbidden
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Internal Server Error
       summary: Listar categorías del catálogo
       tags:
         - Catálogo
+      x-permiso: catalogo:operar
   /api/estado:
     get:
       operationId: estado-catalogo

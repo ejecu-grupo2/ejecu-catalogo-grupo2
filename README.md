@@ -36,6 +36,30 @@ El E2E usa un contenedor PostgreSQL efímero o `TEST_DATABASE_URL`, inicia el bi
 
 `pnpm codegen` genera `contracts/openapi.yaml` y `apps/web/src/api/schema.d.ts`; ambos se commitean. `make generate` en `apps/api` genera el repositorio SQL con sqlc. Handler → Service → Store es la estructura de las futuras funciones de negocio. `/api/estado` solo informa el estado de esta base; no expone datos del catálogo.
 
+## Servicios externos
+
+Catálogo combina Productos (grupo 3) y Stock (grupo 8). Sus contratos se copian sin
+modificar en `contracts/externos/` y el cliente Go se genera desde ahí:
+
+```sh
+cd apps/api
+make clientes
+go mod tidy
+```
+
+`make clientes` crea `internal/clientes/stock/stock.gen.go` con oapi-codegen v2.8.2. No se
+edita a mano: si Stock publica un contrato nuevo, se reemplaza `contracts/externos/stock.yaml`
+y se vuelve a generar. El adaptador `internal/clientes/stock/fuente.go` reenvía el JWT
+como `Authorization: Bearer` y el `X-Request-Id`, con timeout de 5 s.
+
+`STOCK_URL` es obligatoria. Con `docker compose --profile dev up`, el servicio
+`stock-mock` levanta Prism con el contrato de Stock en `http://stock-mock:4010`. Prism
+exige credenciales: para probar a mano, enviar una cookie `sesion` o un encabezado
+`Authorization: Bearer` con cualquier valor.
+
+Productos sigue simulado (`internal/service/productos_simulados.go`) hasta tener su
+contrato.
+
 ## GitHub y SonarQube
 
 Para conectar SonarQube local con los runners de GitHub mediante el túnel HTTPS del ejemplo, seguir [esta guía](docs/sonarqube-docker.md).

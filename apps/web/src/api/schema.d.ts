@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * Listar productos vendibles
-         * @description Retorna los productos con stock disponible para la venta, con filtro opcional por categoría.
+         * @description Retorna los productos que se pueden vender y tienen stock, según el Servicio de Stock, con filtro opcional por categoría y paginación. El total va en el encabezado X-Total-Count.
          */
         get: operations["consultar-catalogo"];
         put?: never;
@@ -33,7 +33,7 @@ export interface paths {
         };
         /**
          * Detalle de un producto en catálogo
-         * @description Obtiene los detalles comerciales y disponibilidad de inventario de un producto específico.
+         * @description Obtiene los detalles comerciales y el stock de un producto vendible. Responde 404 si el producto no existe, no se puede vender o no tiene stock.
          */
         get: operations["obtener-item-catalogo"];
         put?: never;
@@ -168,10 +168,18 @@ export interface components {
              */
             actualizado_en: string;
             /**
-             * @description Categoría a la que pertenece
+             * @deprecated
+             * @description Obsoleto: usar categoria_ids. Nombre de la categoría; el Servicio de Productos no lo entrega
              * @example Periféricos
              */
             categoria: string;
+            /**
+             * @description Identificadores UUID de las categorías a las que pertenece
+             * @example [
+             *       "6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e"
+             *     ]
+             */
+            categoria_ids: string[];
             /**
              * @description Detalle del producto
              * @example Switches táctiles y retroiluminación
@@ -200,7 +208,7 @@ export interface components {
             nombre: string;
             /**
              * Format: int64
-             * @description Precio final de venta en pesos (CLP)
+             * @description Precio final de venta en pesos (CLP), IVA incluido
              * @example 49990
              */
             precio: number;
@@ -228,8 +236,20 @@ export interface operations {
     "consultar-catalogo": {
         parameters: {
             query?: {
-                /** @description Filtrar por nombre de categoría */
+                /**
+                 * @description Filtrar por categoría (UUID)
+                 * @example 6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e
+                 */
+                categoria_id?: string;
+                /**
+                 * @deprecated
+                 * @description Obsoleto: usar categoria_id. Filtrar por nombre de categoría
+                 */
                 categoria?: string;
+                /** @description Número de página, desde 1 */
+                pagina?: number;
+                /** @description Productos por página */
+                tamano?: number;
             };
             header?: never;
             path?: never;
@@ -240,14 +260,51 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "X-Total-Count"?: number;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["ItemCatalogo"][] | null;
                 };
             };
-            /** @description Error */
-            default: {
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -281,8 +338,53 @@ export interface operations {
                     "application/json": components["schemas"]["ItemCatalogo"];
                 };
             };
-            /** @description Error */
-            default: {
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -310,8 +412,26 @@ export interface operations {
                     "application/json": components["schemas"]["Categoria"][] | null;
                 };
             };
-            /** @description Error */
-            default: {
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

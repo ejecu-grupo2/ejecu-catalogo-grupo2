@@ -1,5 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { resolve } from 'node:path'
 import assert from 'node:assert/strict'
 const ejecutar = (comando, args, opciones = {}) =>
@@ -16,18 +17,55 @@ const ID_EXISTENTE = '3f2c9a1e-7b4d-4c8e-9a6f-1d2e3b4c5a60'
 const ID_INEXISTENTE = '00000000-0000-4000-8000-000000000000'
 // Id con el formato antiguo: el contrato lo rechaza antes de llegar al service.
 const ID_MAL_FORMADO = 'prod-101'
-const entornoApi = (entorno, db) => ({
+// Servidor falso del Servicio de Stock (contracts/externos/stock.yaml). Responde
+// GET /api/stock/productos/{producto_id} y guarda las credenciales que recibe.
+const STOCK = {
+  [ID_EXISTENTE]: 15,
+  '8a1d4e7b-2c3f-4a5b-8c9d-0e1f2a3b4c5d': 32,
+  'c5e8f1a2-9b3c-4d6e-a7f8-2b3c4d5e6f70': 8,
+}
+const recibidasPorStock = []
+const servidorStock = createServer((req, res) => {
+  recibidasPorStock.push({
+    autorizacion: req.headers.authorization ?? '',
+    requestId: req.headers['x-request-id'] ?? '',
+  })
+  const id = req.url.match(/^\/api\/stock\/productos\/([0-9a-f-]{36})$/)?.[1]
+  const stock = id ? STOCK[id] : undefined
+  if (stock === undefined) {
+    res.writeHead(404, { 'content-type': 'application/problem+json' })
+    res.end('{"title":"Not Found","status":404}')
+    return
+  }
+  res.writeHead(200, { 'content-type': 'application/json' })
+  res.end(
+    JSON.stringify({
+      producto_id: id,
+      stock_actual: stock,
+      actualizado_en: '2026-11-22T12:00:00Z',
+    }),
+  )
+})
+await new Promise((r) => servidorStock.listen(0, '127.0.0.1', r))
+const STOCK_URL = `http://127.0.0.1:${servidorStock.address().port}`
+// Puerto cerrado: simula el Servicio de Stock caído (modo de falla 12).
+const STOCK_CAIDO = 'http://127.0.0.1:1'
+const entornoApi = (entorno, db, stockUrl = STOCK_URL) => ({
   ...process.env,
   API_ENV: entorno,
   API_PORT: '8080',
   DATABASE_URL: db,
   AUTH_JWKS_URL: 'http://identidad.invalid/jwks',
   FRONTEND_URL: 'http://localhost:5120',
+  STOCK_URL: stockUrl,
   TZ: 'America/Santiago',
   GOCOVERDIR: resolve('.tmp/cobertura'),
 })
-async function arrancar(entorno, db) {
-  proceso = spawn(binario, [], { env: entornoApi(entorno, db), stdio: 'ignore' })
+async function arrancar(entorno, db, stockUrl) {
+  proceso = spawn(binario, [], {
+    env: entornoApi(entorno, db, stockUrl),
+    stdio: 'ignore',
+  })
   for (let i = 0; i < 100; i++) {
     if (proceso.exitCode !== null) throw new Error('La API terminó al iniciar')
     try {
@@ -64,7 +102,7 @@ async function pedir(ruta) {
     cuerpo: await res.json(),
   }
 }
-// Modos de falla 5 a 10 de docs/modos-de-falla.md.
+// Modos de falla 5 a 11 y 17 de docs/modos-de-falla.md.
 async function revisarCatalogo(lineas) {
   const todos = await pedir('/api/catalogo')
   assert.equal(todos.estado, 200)
@@ -77,6 +115,13 @@ async function revisarCatalogo(lineas) {
     `/api/catalogo: ${todos.estado}, ${todos.cuerpo.length} productos vendibles`,
   )
 
+  // Modo de falla 11: paginación, con el total en X-Total-Count.
+  const pagina = await fetch('http://localhost:8080/api/catalogo?pagina=2&tamano=2')
+  assert.equal(pagina.status, 200)
+  assert.equal((await pagina.json()).length, 1)
+  assert.equal(pagina.headers.get('x-total-count'), '3')
+  lineas.push(`/api/catalogo?pagina=2&tamano=2: ${pagina.status}, 1 de 3 productos`)
+
   const categoria = 'Periféricos'
   const filtrados = await pedir(
     `/api/catalogo?categoria=${encodeURIComponent(categoria)}`,
@@ -85,6 +130,16 @@ async function revisarCatalogo(lineas) {
   assert.ok(filtrados.cuerpo.every((item) => item.categoria === categoria))
   lineas.push(
     `/api/catalogo?categoria=${categoria}: ${filtrados.estado}, ${filtrados.cuerpo.length} productos`,
+  )
+
+  // categoria_id reemplaza al filtro por nombre, que queda obsoleto.
+  const ID_ACCESORIOS = '1e2f3a4b-5c6d-4e7f-8a9b-0c1d2e3f4a5b'
+  const porId = await pedir(`/api/catalogo?categoria_id=${ID_ACCESORIOS}`)
+  assert.equal(porId.estado, 200)
+  assert.ok(porId.cuerpo.length > 0, 'Sin productos en Accesorios')
+  assert.ok(porId.cuerpo.every((item) => item.categoria_ids.includes(ID_ACCESORIOS)))
+  lineas.push(
+    `/api/catalogo?categoria_id={id}: ${porId.estado}, ${porId.cuerpo.length} productos`,
   )
 
   const sinResultados = await pedir('/api/catalogo?categoria=Inexistente')
@@ -119,6 +174,18 @@ async function revisarCatalogo(lineas) {
   lineas.push(
     `/api/categorias: ${categorias.estado}, ${categorias.cuerpo.length} categorías`,
   )
+
+  // Modo de falla 17: el JWT y el X-Request-Id llegan a Stock.
+  recibidasPorStock.length = 0
+  const conSesion = await fetch(`http://localhost:8080/api/catalogo/${ID_EXISTENTE}`, {
+    headers: { cookie: 'sesion=jwt-e2e', 'x-request-id': 'e2e-req-1' },
+  })
+  assert.equal(conSesion.status, 200)
+  assert.equal(conSesion.headers.get('x-request-id'), 'e2e-req-1')
+  assert.deepEqual(recibidasPorStock, [
+    { autorizacion: 'Bearer jwt-e2e', requestId: 'e2e-req-1' },
+  ])
+  lineas.push('Reenvío a Stock: Bearer y X-Request-Id propagados')
 }
 try {
   let db = process.env.TEST_DATABASE_URL
@@ -180,6 +247,15 @@ try {
   // Modo de falla 2: configuración incompleta.
   assert.equal(await codigoSalidaSin('DATABASE_URL', db), 1)
   lineas.push('Configuración incompleta (sin DATABASE_URL): código 1')
+  // Modo de falla 12: Stock caído responde 503 rápido, sin colgar la request.
+  await arrancar('test', db, STOCK_CAIDO)
+  const inicio = Date.now()
+  const sinStock = await pedir('/api/catalogo')
+  assert.equal(sinStock.estado, 503)
+  assert.ok(sinStock.tipo.startsWith('application/problem+json'), sinStock.tipo)
+  assert.ok(Date.now() - inicio < 6000, 'La request quedó colgada')
+  lineas.push(`Stock no disponible: ${sinStock.estado} problem+json`)
+  await detener()
   await arrancar(
     'test',
     'postgres://postgres:prueba@127.0.0.1:1/postgres?sslmode=disable',
@@ -192,6 +268,7 @@ try {
   )
 } finally {
   await detener()
+  servidorStock.close()
   if (contenedor) ejecutar('docker', ['stop', contenedor])
 }
 ejecutar('go', [

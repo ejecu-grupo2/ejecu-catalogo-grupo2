@@ -1,5 +1,6 @@
 pnpm-lock.yaml
 contracts/openapi.yaml
+contracts/externos/
 docs/DAS.md
 **/dist
 **/coverage
