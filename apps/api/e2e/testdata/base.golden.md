@@ -3,13 +3,17 @@
 /api/estado: 200
 /api/docs: 200
 /api/catalogo: 200, 3 productos vendibles
+/api/catalogo?pagina=2&tamano=2: 200, 1 de 3 productos
 /api/catalogo?categoria=Periféricos: 200, 2 productos
+/api/catalogo?categoria_id={id}: 200, 1 productos
 /api/catalogo?categoria=Inexistente: 200, lista vacía
 /api/catalogo/{id} existente: 200
 /api/catalogo/{id} inexistente: 404 problem+json
 /api/catalogo/{id} no UUID: 422 problem+json
 /api/categorias: 200, 2 categorías
+Reenvío a Stock: Bearer y X-Request-Id propagados
 prod /api/docs: 404
 prod /api/openapi.yaml: 404
 Configuración incompleta (sin DATABASE_URL): código 1
+Stock no disponible: 503 problem+json
 PostgreSQL no disponible: 503
